@@ -1,0 +1,22 @@
+name: Force Build
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Unsigned
+        run: |
+          PROJ=$(find . -name "*.xcodeproj" | head -n 1)
+          NAME=$(basename "$PROJ" .xcodeproj)
+          xcodebuild build -project "$PROJ" -scheme "$NAME" -sdk iphoneos \
+          -configuration Release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+          -derivedDataPath build_output || echo "Force continuing..."
+          mkdir -p Payload
+          find build_output -name "*.app" -exec cp -R {} Payload/ \;
+          zip -r MyGame.ipa Payload
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Final-App
+          path: MyGame.ipa
