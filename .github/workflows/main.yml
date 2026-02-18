@@ -4,31 +4,32 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Force Build
-        run: |
-          PROJ=$(find . -name "*.xcodeproj" | head -n 1)
-          NAME=$(basename "$PROJ" .xcodeproj)
-          
+      
+uses: actions/checkout@v4
+name: Build
+    run: |# 1. Find the project and the correct scheme
+      PROJ=$(find . -name "*.xcodeproj" | head -n 1)
+      SCHEME=$(xcodebuild -list -project "$PROJ" | grep -A 5 "Schemes:" | tail -n 1 | xargs)
+      echo "Building Scheme: $SCHEME"
+
+          # 2. Force the build
           xcodebuild build -project "$PROJ" \
-          -scheme "$NAME" -sdk iphoneos -configuration Release \
-          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+          -scheme "$SCHEME" \
+          -sdk iphoneos \
+          -configuration Release \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
           -derivedDataPath build_output
-          
-          # This part hunts for the app and creates the Payload
+
+          # 3. Manually create the Payload folder (This fixes the "No bundle" error)
           mkdir -p Payload
-          find build_output -name "*.app" -exec cp -R {} Payload/ \;
-          
-          # Check if the app was actually found
-          if [ -z "$(ls -A Payload)" ]; then
-            echo "Error: No app file found. Build failed."
-            exit 1
-          fi
-          
+          cp -R build_output/Build/Products/Release-iphoneos/.app Payload/ 2>/dev/null || cp -R build_output/Build/Products/Release-iphoneos/.app Payload/
+
+Zip it up
           zip -r MyGame.ipa Payload
-          
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: Working-App
-          path: MyGame.ipa
+
+name: Upload
+uses: actions/upload-artifact@v4
+with:
+  name: Fixed-IPA
+  path: MyGame.ipa
